@@ -9,6 +9,7 @@ var isArray = require('isarray');
 var forEach = require('foreach');
 var reduce = require('array-reduce');
 var getObjectKeys = require('object-keys');
+var formatError = require('format-error').format
 var JSON = require('json3');
 
 /**
@@ -91,6 +92,7 @@ inspect.styles = {
   'null': 'bold',
   'string': 'green',
   'date': 'magenta',
+  'error': 'red',
   // "name": intentionally not styling
   'regexp': 'red'
 };
@@ -188,10 +190,6 @@ function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
   return output;
 }
 
-function formatError(value) {
-  return '[' + Error.prototype.toString.call(value) + ']';
-}
-
 function formatValue(ctx, value, recurseTimes) {
   // Provide a hook for user-specified inspect functions.
   // Check that value is an object with an inspect function on it
@@ -231,7 +229,7 @@ function formatValue(ctx, value, recurseTimes) {
   // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
   if (isError(value)
       && (indexOf(keys, 'message') >= 0 || indexOf(keys, 'description') >= 0)) {
-    return formatError(value);
+    return ctx.stylize(formatError(value), 'error');
   }
 
   // Some type of object without properties can be shortcutted.
@@ -247,7 +245,7 @@ function formatValue(ctx, value, recurseTimes) {
       return ctx.stylize(Date.prototype.toString.call(value), 'date');
     }
     if (isError(value)) {
-      return formatError(value);
+      return ctx.stylize(formatError(value), 'error');
     }
   }
 
@@ -277,7 +275,7 @@ function formatValue(ctx, value, recurseTimes) {
 
   // Make error with message first say the error
   if (isError(value)) {
-    base = ' ' + formatError(value);
+    base = ' ' + ctx.stylize(formatError(value), 'error');
   }
 
   if (keys.length === 0 && (!array || value.length == 0)) {
