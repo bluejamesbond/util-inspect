@@ -10,6 +10,7 @@
     "indexof": "0.0.1",
     "isarray": "0.0.1",
     "json3": "3.3.0",
-    "object-keys": "0.5.0"
+    "object-keys": "0.5.0",
+    "strip-ansi": "^3.0.0"
   }
 }
