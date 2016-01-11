@@ -1,4 +1,3 @@
-
 /**
  * Module dependencies.
  */
@@ -9,8 +8,19 @@ var isArray = require('isarray');
 var forEach = require('foreach');
 var reduce = require('array-reduce');
 var getObjectKeys = require('object-keys');
-var formatError = require('format-error').format
 var JSON = require('json3');
+var fe = require('format-error').format
+var strip = require('strip-ansi');
+
+function formatError(ctx, value) {
+  return fe(value).split('\n').map(function (m) {
+    m = strip(m);
+    if (m.indexOf('Error: ') > -1) {
+      return ctx.stylize(m, 'error');
+    }
+    return ctx.stylize(m, 'stack');
+  }).join('\n');
+}
 
 /**
  * Make sure `Object.keys` work for `undefined`
@@ -20,7 +30,7 @@ var JSON = require('json3');
  * @api private
  */
 
-function objectKeys(val){
+function objectKeys(val) {
   if (Object.keys) return Object.keys(val);
   return getObjectKeys(val);
 }
@@ -68,19 +78,19 @@ function inspect(obj, opts) {
 
 // http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
 inspect.colors = {
-  'bold' : [1, 22],
-  'italic' : [3, 23],
-  'underline' : [4, 24],
-  'inverse' : [7, 27],
-  'white' : [37, 39],
-  'grey' : [90, 39],
-  'black' : [30, 39],
-  'blue' : [34, 39],
-  'cyan' : [36, 39],
-  'green' : [32, 39],
-  'magenta' : [35, 39],
-  'red' : [31, 39],
-  'yellow' : [33, 39]
+  'bold': [1, 22],
+  'italic': [3, 23],
+  'underline': [4, 24],
+  'inverse': [7, 27],
+  'white': [37, 39],
+  'grey': [90, 39],
+  'black': [30, 39],
+  'blue': [34, 39],
+  'cyan': [36, 39],
+  'green': [32, 39],
+  'magenta': [35, 39],
+  'red': [31, 39],
+  'yellow': [33, 39]
 };
 
 // Don't use 'blue' not visible on cmd.exe
@@ -92,8 +102,9 @@ inspect.styles = {
   'null': 'bold',
   'string': 'green',
   'date': 'magenta',
-  'error': 'red',
-  // "name": intentionally not styling
+  'error': ['bold', 'red'],
+  'stack': 'red',
+  // 'name': 'cyan',
   'regexp': 'red'
 };
 
@@ -112,9 +123,16 @@ function isUndefined(arg) {
 function stylizeWithColor(str, styleType) {
   var style = inspect.styles[styleType];
 
-  if (style) {
+  if (Array.isArray(style)) {
+    for (var i = 0; i < style.length; i++) {
+      str = '\u001b[' + inspect.colors[style[i]][0] + 'm' + str +
+          '\u001b[' + inspect.colors[style[i]][1] + 'm';
+    }
+
+    return str;
+  } else if (style) {
     return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-           '\u001b[' + inspect.colors[style][1] + 'm';
+        '\u001b[' + inspect.colors[style][1] + 'm';
   } else {
     return str;
   }
@@ -164,7 +182,7 @@ function objectToString(o) {
 function arrayToHash(array) {
   var hash = {};
 
-  forEach(array, function(val, idx) {
+  forEach(array, function (val, idx) {
     hash[val] = true;
   });
 
@@ -181,7 +199,7 @@ function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
       output.push('');
     }
   }
-  forEach(keys, function(key) {
+  forEach(keys, function (key) {
     if (!key.match(/^\d+$/)) {
       output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
           key, true));
@@ -196,9 +214,9 @@ function formatValue(ctx, value, recurseTimes) {
   if (ctx.customInspect &&
       value &&
       isFunction(value.inspect) &&
-      // Filter out the util module, it's inspect function is special
+        // Filter out the util module, it's inspect function is special
       value.inspect !== inspect &&
-      // Also filter out any prototype objects using the circular check.
+        // Also filter out any prototype objects using the circular check.
       !(value.constructor && value.constructor.prototype === value)) {
     var ret = value.inspect(recurseTimes, ctx);
     if (!isString(ret)) {
@@ -229,7 +247,7 @@ function formatValue(ctx, value, recurseTimes) {
   // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
   if (isError(value)
       && (indexOf(keys, 'message') >= 0 || indexOf(keys, 'description') >= 0)) {
-    return ctx.stylize(formatError(value), 'error');
+    return formatError(ctx, value);
   }
 
   // Some type of object without properties can be shortcutted.
@@ -245,7 +263,7 @@ function formatValue(ctx, value, recurseTimes) {
       return ctx.stylize(Date.prototype.toString.call(value), 'date');
     }
     if (isError(value)) {
-      return ctx.stylize(formatError(value), 'error');
+      return formatError(ctx, value);
     }
   }
 
@@ -275,7 +293,7 @@ function formatValue(ctx, value, recurseTimes) {
 
   // Make error with message first say the error
   if (isError(value)) {
-    base = ' ' + ctx.stylize(formatError(value), 'error');
+    base = ' ' + formatError(ctx, value);
   }
 
   if (keys.length === 0 && (!array || value.length == 0)) {
@@ -296,7 +314,7 @@ function formatValue(ctx, value, recurseTimes) {
   if (array) {
     output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
   } else {
-    output = map(keys, function(key) {
+    output = map(keys, function (key) {
       return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
     });
   }
@@ -308,7 +326,7 @@ function formatValue(ctx, value, recurseTimes) {
 
 function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
   var name, str, desc;
-  desc = { value: void 0 };
+  desc = {value: void 0};
   try {
     // ie6 › navigator.toString
     // throws Error: Object doesn't support this property or method
@@ -348,13 +366,13 @@ function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
       }
       if (str.indexOf('\n') > -1) {
         if (array) {
-          str = map(str.split('\n'), function(line) {
+          str = map(str.split('\n'), function (line) {
             return '  ' + line;
           }).join('\n').substr(2);
         } else {
-          str = '\n' + map(str.split('\n'), function(line) {
-            return '   ' + line;
-          }).join('\n');
+          str = '\n' + map(str.split('\n'), function (line) {
+                return '   ' + line;
+              }).join('\n');
         }
       }
     } else {
@@ -371,8 +389,8 @@ function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
       name = ctx.stylize(name, 'name');
     } else {
       name = name.replace(/'/g, "\\'")
-                 .replace(/\\"/g, '"')
-                 .replace(/(^"|"$)/g, "'");
+          .replace(/\\"/g, '"')
+          .replace(/(^"|"$)/g, "'");
       name = ctx.stylize(name, 'string');
     }
   }
@@ -385,8 +403,8 @@ function formatPrimitive(ctx, value) {
     return ctx.stylize('undefined', 'undefined');
   if (isString(value)) {
     var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-                                             .replace(/'/g, "\\'")
-                                             .replace(/\\"/g, '"') + '\'';
+            .replace(/'/g, "\\'")
+            .replace(/\\"/g, '"') + '\'';
     return ctx.stylize(simple, 'string');
   }
   if (isNumber(value))
@@ -400,7 +418,7 @@ function formatPrimitive(ctx, value) {
 
 function reduceToSingleString(output, base, braces) {
   var numLinesEst = 0;
-  var length = reduce(output, function(prev, cur) {
+  var length = reduce(output, function (prev, cur) {
     numLinesEst++;
     if (cur.indexOf('\n') >= 0) numLinesEst++;
     return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
@@ -408,11 +426,11 @@ function reduceToSingleString(output, base, braces) {
 
   if (length > 60) {
     return braces[0] +
-           (base === '' ? '' : base + '\n ') +
-           ' ' +
-           output.join(',\n  ') +
-           ' ' +
-           braces[1];
+        (base === '' ? '' : base + '\n ') +
+        ' ' +
+        output.join(',\n  ') +
+        ' ' +
+        braces[1];
   }
 
   return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
